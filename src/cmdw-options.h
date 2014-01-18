@@ -33,6 +33,7 @@ int parse_and_assemble_options(char **oargv, char ***argv);
 
 int prepare_odd_pages();
 int prepare_even_pages();
+int prepare_all_pages();
 
 void cleanup_options();
 

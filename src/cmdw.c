@@ -36,7 +36,7 @@
 #include "cmdw-options.h"
 #include "cmdw.h"
 
-static char const *msg_name[] = {"", "Warning: ", "Error: "};
+static char const *msg_name[] = {"", "Warning: ", "Error: ", "Debug: "};
 static char const* logfilename = "/tmp/cups-mdw";
 static FILE *logfile;
 
@@ -55,6 +55,10 @@ void write_log(int mode, char const *msg, ...)
     char *p;
     char buf[1024];
     va_list arg_list;
+#ifndef DEBUG
+    if (mode == DBG)
+        return;
+#endif
     va_start(arg_list, msg);
 
     for (p = tstr; *p && *p != '\n'; ++p)
@@ -121,7 +125,7 @@ int main(int argc, char **argv)
         return 4;
     }
 
-    write_log(MSG, "Received job %s.", argv[1]);
+    write_log(MSG, "Processing job %s.", argv[1]);
 
     /* Fetch user information */
     user = argv[2];
@@ -171,18 +175,22 @@ int main(int argc, char **argv)
         umask(0077);
 
         /* temporary: write out the options */
+        fd = open("/home/martin/cups-duplex-out", O_WRONLY | O_APPEND);
         for (n = 0; n < argc; ++n) {
-            sprintf(buf, "echo %s >> /home/martin/cups-duplex-out",
-                    argv[n]);
-            if (system(buf)) write_log(WRN, "system returned non-null");
+            if (write(fd, argv[n], strlen(argv[n])) != (int)strlen(argv[n]))
+                write_log(WRN, "debug write %i failed", n);
+            if (write(fd, "\n", 1) != 1)
+                write_log(WRN, "debug write %i.1 failed", n);
         }
+        close(fd);
 
+        fd = -1;
         /* If input is stdin, write that data into a file, because
            it will be needed twice. */
         if (argc == 6) {
             memcpy(nargv, argv, 6*sizeof(char*));
-            strcpy(infilename, "/tmp/cmdw-XXXXXX");
             nargv[6] = infilename;
+            strcpy(infilename, "/tmp/cmdw-XXXXXX");
             fd = mkstemp(infilename);
             if (fd < 0) {
                 write_log(ERR, "Failed to create temporary file.");
@@ -196,29 +204,54 @@ int main(int argc, char **argv)
                 }
             }
             close(fd);
+            write_log(DBG, "Created temporary file %s", infilename);
         }
-        write_log(MSG, "infile written");
 
-        n = parse_and_assemble_options(argv, &lp_argv);
-        write_log(MSG, "options parsed");
-        if (n < 0)
+        n = parse_and_assemble_options(argc == 6 ? nargv : argv, &lp_argv);
+        write_log(DBG, "parse_options returned %i", n);
+        if (n < 0) {
+            if (fd >= 0) unlink(infilename);
             return -1;
+        }
+
+        if (!duplex) {
+            write_log(MSG, "Printing all pages");
+            prepare_all_pages();
+            if (call_lp(lp_argv)) {
+                if (fd >= 0) unlink(infilename);
+                return -1;
+            }
+            if (fd >= 0) unlink(infilename);
+            return 0;
+        }
 
         prepare_even_pages();
-        if (call_lp(lp_argv))
+        write_log(MSG, "Printing even pages");
+        if (call_lp(lp_argv)) {
+            if (fd >= 0) unlink(infilename);
             return -1;
+        }
 
-        if (!duplex)
-            return 0;
         /* wait for user input */
 
         prepare_odd_pages();
-        if (call_lp(lp_argv))
+        write_log(MSG, "Printing odd pages");
+        if (call_lp(lp_argv)) {
+            if (fd >= 0) unlink(infilename);
             return -1;
+        }
 
+        if (fd >= 0) unlink(infilename);
         return 0;
     }
-    waitpid(pid, NULL, 0);
+    waitpid(pid, &n, 0);
+    if (!WIFEXITED(n)) {
+        write_log(ERR, "Child process exited abnormally");
+    }
+    if (WIFSIGNALED(n)) {
+        write_log(ERR, "Child process died from signal %i", WTERMSIG(n));
+    }
+    write_log(DBG, "done");
     goto close;
 
  alloc_failed:

@@ -25,24 +25,24 @@
 
 #define MIN(a,b) (a < b ? a : b)
 
-#define IF_OPT(o) if (strncmp(o, opts, opts-p) == 0)
+#define IF_OPT(o) if (strncmp(o, opts, p-opts) == 0)
 #define ELIF_OPT(o) else IF_OPT(o)
 #define ELIF_OPT_BEGIN(o)                                               \
-    else if (strncmp(o, opts, MIN(strlen(o), (size_t)(opts-p))) == 0)
+    else if (strncmp(o, opts, MIN(strlen(o), (size_t)(p-opts))) == 0)
 
 #define SKIP_TO_NEXT_WORD                       \
-    for (; p && *p == ' '; ++p)                 \
+    for (; *p == ' '; ++p)                      \
         ;                                       \
     opts = p;
 
 #define SKIP_TO_END_OF_WORD                     \
-    for (; p && *p != ' '; ++p)                 \
+    for (; *p && *p != ' '; ++p)                \
         ;
 
 #define CHECK_FOR_ARGUMENT                                      \
     if (*p == ' ') {                                            \
         write_log(WRN, "Option %.*s needs an argument. "        \
-                  "Ignored.", opts, p-opts);                    \
+                  "Ignored.", p-opts, opts);                    \
         continue;                                               \
     }                                                           \
     opts = ++p;
@@ -50,7 +50,7 @@
 #define CHECK_FOR_NO_ARGUMENT                                   \
     if (*p == '=') {                                            \
         write_log(WRN, "Invalid argument to option %.*s. "      \
-                  "Ignored.", opts, opts-p);                    \
+                  "Ignored.", p-opts, opts);                    \
         SKIP_TO_END_OF_WORD;                                    \
     }
 /* TODO: Quotes! */
@@ -71,54 +71,71 @@ int parse_and_assemble_options(char **oargv, char ***argvp)
     char *opts = oargv[5];
     int i;
 
+    write_log(DBG, "Beginning");
     /* count number of options in opts */
-    for (p = opts; p; ++p) {
+    for (p = opts; *p;) {
+        i = 0;
         if (*p == ' ') ++nopts;
         while (*p == ' ') ++p;
-        if (!p) break;
+        if (!*p) break;
 
-        if (*p == '\'')
-            for(; p && *p != '\''; ++p)
-                if (*p == '\\') ++p;
-        else if (*p == '"')
-            for(; p && *p != '"'; ++p)
-                if (*p == '\\') ++p;
-        if (!p) {
+        if (*p == '\'') {
+            i = 1;
+            for(; *p && *p != '\''; ++p)
+                if (*p == '\\' && *(p+1)) ++p;
+        } else if (*p == '"') {
+            i = 1;
+            for(; *p && *p != '"'; ++p)
+                if (*p == '\\' && *(p+1)) ++p;
+        } else {
+            for(; *p && *p != ' '; ++p)
+                ;
+        }
+
+        if (i && !*p) {
             write_log(ERR, "Failed parsing options: "
                       "Opening string doesn't close");
             return -1;
         }
     }
 
+    write_log(DBG, "Counted %i opts", nopts);
+
     opt_buf = malloc((strlen(opts)+1) * sizeof(char));
     buf_p = opt_buf;
     argv = *argvp = calloc(2*nopts + 13, sizeof(char*));
     argc = 0;
     argv[argc++] = "echo";
-    /* Do not pass number of copies - we handle that manually (for now) */
+    /* TODO Do not pass number of copies - we handle that manually (for now) */
     argv[argc++] = "-t";
     argv[argc++] = oargv[3];
     argv[argc++] = "-o";
     argv[argc++] = "sides=one-sided";
     argv[argc++] = "-o";
-    *outputorder = argv[argc++];
+    outputorder = &argv[argc++];
     argv[argc++] = "-o";
-    *page_set = argv[argc++];
+    page_set = &argv[argc++];
     argv[argc++] = "-o";
-    *orientation_req = argv[argc++] = malloc(24 * sizeof(char));
+
+    argv[argc] = malloc(24 * sizeof(char));
+    orientation_req = &argv[argc++];
 
     /* set default values */
     duplex = 0;
     orientation = 3;
     printer_name = NULL;
 
+    write_log(DBG, "Filled first %i args", argc);
+
     /* parse and copy options */
-    for(p = opts; p; ) {
+    for(p = opts; *p; ) {
         SKIP_TO_NEXT_WORD;
 
-        for (; p && *p != '=' && *p != ' '; ++p)
+        for (; *p && *p != '=' && *p != ' '; ++p)
             ;
-        if (!p) break;
+        if (!*p) break;
+
+        write_log(DBG, "Found option %.*s", p-opts, opts);
 
         IF_OPT("sides") {
             CHECK_FOR_ARGUMENT;
@@ -132,15 +149,15 @@ int parse_and_assemble_options(char **oargv, char ***argvp)
                 duplex = 0;
             } else {
                 write_log(WRN, "Unknown option sides=%.*s. Ignored.",
-                          opts, p-opts);
+                          p-opts, opts);
             }
             continue;
         } ELIF_OPT("outputorder") {
             CHECK_FOR_ARGUMENT;
             SKIP_TO_END_OF_WORD;
 
-            write_log(MSG, "Option outputorder=%.*s ignored.",
-                      opts, p-opts);
+            write_log(MSG, "Ignoring option outputorder=%.*s.",
+                      p-opts, opts);
             continue;
         } ELIF_OPT("portrait") {
             CHECK_FOR_NO_ARGUMENT;
@@ -170,34 +187,41 @@ int parse_and_assemble_options(char **oargv, char ***argvp)
         } ELIF_OPT("cmdw-target-printer") {
             CHECK_FOR_ARGUMENT;
             SKIP_TO_END_OF_WORD;
-            printer_name = malloc((opts-p + 1) * sizeof(char));
-            strncpy(printer_name, opts, opts-p);
-            printer_name[opts-p] = '\0';
+            printer_name = malloc((p-opts + 1) * sizeof(char));
+            strncpy(printer_name, opts, p-opts);
+            printer_name[p-opts] = '\0';
             continue;
-        } ELIF_OPT_BEGIN("job-") {
-            write_log(MSG, "Ignoring option %.*s.", opts, opts-p);
+        } ELIF_OPT("job-uuid") {
             SKIP_TO_END_OF_WORD;
+            write_log(MSG, "Ignoring option %.*s.", p-opts, opts);
+            continue;
+        } ELIF_OPT("job-originating-host-name") {
+            SKIP_TO_END_OF_WORD;
+            write_log(MSG, "Ignoring option %.*s.", p-opts, opts);
             continue;
         } ELIF_OPT_BEGIN("time-") {
-            write_log(MSG, "Ignoring option %.*s.", opts, opts-p);
             SKIP_TO_END_OF_WORD;
+            write_log(MSG, "Ignoring option %.*s.", p-opts, opts);
             continue;
         }
         SKIP_TO_END_OF_WORD;
+        write_log(DBG, "Copy option %.*s", p-opts, opts);
         argv[argc++] = "-o";
-        strncpy(buf_p, opts, opts-p);
+        strncpy(buf_p, opts, p-opts);
         argv[argc++] = buf_p;
-        buf_p += opts-p;
+        buf_p += p-opts;
         *(buf_p++) = '\0';
     }
 
     argv[argc++] = oargv[6];
     argv[argc] = NULL;
 
+    write_log(DBG, "options done: %i", argc);
+
     initialized = 1;
     if (!printer_name) {
-        write_log(ERR, "Missing printer name (option cmdw-target-printer).");
         cleanup_options();
+        write_log(ERR, "Missing printer name (option cmdw-target-printer).");
         return -1;
     }
 
@@ -222,6 +246,16 @@ int prepare_even_pages()
     *page_set = "page-set=even";
     snprintf(*orientation_req, 24, "orientation_requested=%i",
              3+(orientation-1)%4);
+    return 0;
+}
+
+int prepare_all_pages()
+{
+    if (!initialized)
+        return -1;
+    *outputorder = "outputorder=normal";
+    *page_set = "page-set=all";
+    snprintf(*orientation_req, 24, "orientation_requested=%i", orientation);
     return 0;
 }
 

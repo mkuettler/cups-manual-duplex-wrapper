@@ -27,6 +27,7 @@
 #define MSG 0
 #define WRN 1
 #define ERR 2
+#define DBG 3
 
 EXTERN void write_log(int mode, char const *msg, ...);
 
