@@ -103,9 +103,9 @@ int parse_and_assemble_options(char **oargv, char ***argvp)
 
     opt_buf = malloc((strlen(opts)+1) * sizeof(char));
     buf_p = opt_buf;
-    argv = *argvp = calloc(2*nopts + 13, sizeof(char*));
+    argv = *argvp = calloc(2*nopts + 15, sizeof(char*));
     argc = 0;
-    argv[argc++] = "echo";
+    argv[argc++] = "/home/martin/cups-test";
     /* TODO Do not pass number of copies - we handle that manually (for now) */
     argv[argc++] = "-t";
     argv[argc++] = oargv[3];
@@ -213,17 +213,20 @@ int parse_and_assemble_options(char **oargv, char ***argvp)
         *(buf_p++) = '\0';
     }
 
-    argv[argc++] = oargv[6];
-    argv[argc] = NULL;
-
-    write_log(DBG, "options done: %i", argc);
-
     initialized = 1;
     if (!printer_name) {
         cleanup_options();
         write_log(ERR, "Missing printer name (option cmdw-target-printer).");
         return -1;
     }
+
+    argv[argc++] = "-p";
+    argv[argc++] = printer_name;
+
+    argv[argc++] = oargv[6];
+    argv[argc] = NULL;
+
+    write_log(DBG, "options done: %i", argc);
 
     return argc;
 }

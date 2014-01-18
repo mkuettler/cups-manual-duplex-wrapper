@@ -25,13 +25,13 @@
 *FileVersion:	"1.1"
 *LanguageVersion: English
 *LanguageEncoding: ISOLatin1
-*PCFileName:	"CUPS-PDF.PPD"
+*PCFileName:	"manual-duplex-wrapper.ppd"
 *Manufacturer:	"Generic"
 *Product:	"(CUPS v1.1)"
-*ModelName:     "Generic CUPS-PDF Printer"
-*ShortNickName: "Generic CUPS-PDF Printer"
-*NickName:      "Generic CUPS-PDF Printer"
-*1284DeviceID:  "MFG:Generic;MDL:CUPS-PDF Printer;DES:Generic CUPS-PDF Printer;CLS:PRINTER;CMD:POSTSCRIPT;"
+*ModelName:     "Generic Virtual Duplex Printer"
+*ShortNickName: "Generic Virtual Duplex Printer"
+*NickName:      "Generic Virtual Duplex Printer"
+*1284DeviceID:  "MFG:Generic;MDL:CUPS-MDW Printer;DES:Generic Virtual Duplex Printer;CLS:PRINTER;CMD:POSTSCRIPT;"
 *% cupsFilter:    "application/vnd.cups-postscript 0 pstitleiconv"
 *PSVersion:	"(2017.000) 0"
 *LanguageLevel:	"2"
@@ -57,6 +57,14 @@
 *ParamCustomPageSize HeightOffset: 5 points 0 0
 
 *OpenGroup: General/General
+
+*OpenUI *Duplex/2-Sided Printing: PickOne
+*%OrderDependency: 10 AnySetup *Duplex
+*DefaultDuplex: DuplexNoTumble
+*Duplex None/Off (1-Sided): ""
+*Duplex DuplexNoTumble/Long-Edge (Portrait): ""
+*Duplex DuplexTumble/Short-Edge (Landscape): ""
+*CloseUI: *Duplex
 
 *OpenUI *PageSize/Page Size: PickOne
 *OrderDependency: 100 AnySetup *PageSize

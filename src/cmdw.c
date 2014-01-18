@@ -25,6 +25,7 @@
 #include <stdarg.h>
 
 #include <string.h>
+#include <errno.h>
 #include <time.h>
 #include <unistd.h>
 #include <pwd.h>
@@ -75,8 +76,8 @@ int call_lp(char** argv)
     int status;
     pid_t pid = fork();
     if (!pid) {
-        if (execvp("echo", argv)) {
-            write_log(ERR, "Call to lp failed");
+        if (execvp("/home/martin/cups-test", argv)) {
+            write_log(ERR, "Call to lp failed: %s", strerror(errno));
             return -1;
         }
         return 0;
@@ -232,7 +233,7 @@ int main(int argc, char **argv)
             return -1;
         }
 
-        /* wait for user input */
+        /* TODO wait for user input */
 
         prepare_odd_pages();
         write_log(MSG, "Printing odd pages");
