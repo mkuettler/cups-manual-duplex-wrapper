@@ -18,7 +18,7 @@ cmdw: ${CMDWOBJ}
 debug: ${CMDWSRC} ${CMDWHDR}
 	${CC} ${CFLAGS} -DDEBUG -g cmdw.c cmdw-options.c -o cmdw
 
-test: debug
+test:
 	lp -o sides=two-sided-long-edge -d Duplex/ML-1640 ~/studium/diplom/arbeit.pdf
 
 gdb: debug

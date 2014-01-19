@@ -1,7 +1,13 @@
 
-cups-duplex-wrapper is (supposed to become) a tool that allows duplex
-printing even when the actual printing driver doesn't support that option.
+cups-manueal-duplex-wrapper is a tool that allows duplex printing even when 
+the actual printing driver doesn't support that option.
 It acts as a wrapper around the printer that splits the print job into two
 jobs.
 
-More to come.
+There still are some limitations and hard-coded defaults, but without having
+done a real test I think it should work. Install with 
+	make && sudo make install
+
+I learnt how it could work from cups-pdf, and copied quite some ideas from
+there.
+
