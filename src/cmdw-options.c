@@ -105,7 +105,7 @@ int parse_and_assemble_options(char **oargv, char ***argvp)
     buf_p = opt_buf;
     argv = *argvp = calloc(2*nopts + 15, sizeof(char*));
     argc = 0;
-    argv[argc++] = "/home/martin/cups-test";
+    argv[argc++] = PRINT_CMD;
     /* TODO Do not pass number of copies - we handle that manually (for now) */
     argv[argc++] = "-t";
     argv[argc++] = oargv[3];

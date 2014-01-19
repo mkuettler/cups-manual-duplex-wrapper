@@ -18,6 +18,8 @@
 #ifndef CUPS_MANUAL_DUPLEX_WRAPPER_HEADER
 #define CUPS_MANUAL_DUPLEX_WRAPPER_HEADER
 
+#define PRINT_CMD "/home/martin/cups-test"
+
 #ifdef CONFIG
 # define EXTERN extern
 #else

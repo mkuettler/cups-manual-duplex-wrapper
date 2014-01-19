@@ -49,6 +49,11 @@ int open_log()
     return 1;
 }
 
+void close_log()
+{
+    fclose(logfile);
+}
+
 void write_log(int mode, char const *msg, ...)
 {
     time_t t = time(NULL);
@@ -76,7 +81,7 @@ int call_lp(char** argv)
     int status;
     pid_t pid = fork();
     if (!pid) {
-        if (execvp("/home/martin/cups-test", argv)) {
+        if (execvp(PRINT_CMD, argv)) {
             write_log(ERR, "Call to lp failed: %s", strerror(errno));
             return -1;
         }
@@ -90,9 +95,21 @@ int call_lp(char** argv)
     return 0;
 }
 
+#define ERROR(c, msg, ...)                      \
+    do {                                        \
+        write_log(ERR, msg, ##__VA_ARGS__);     \
+        retval = c;                             \
+        goto close;                             \
+    } while (0);
+
+#define CLOSE(c)                                \
+    do {                                        \
+        retval = c;                             \
+        goto close;                             \
+    } while (0);
+
 int main(int argc, char **argv)
 {
-    pid_t pid;
     struct passwd *passwd;
     char const *user = 0;
     gid_t *groups = 0;
@@ -104,6 +121,8 @@ int main(int argc, char **argv)
     int fd;
     int n;
     char **lp_argv;
+
+    infilename[0] = '\0';
 
     /* Check for valid call */
     if (argc == 1) {
@@ -131,12 +150,8 @@ int main(int argc, char **argv)
     /* Fetch user information */
     user = argv[2];
     passwd = getpwnam(user);
-    if (!passwd) {
-        write_log(ERR, "Failed to get user information for user %s.\n",
-                  user);
-        retval = 2;
-        goto close;
-    }
+    if (!passwd)
+        ERROR(2, "Failed to get user information for user %s.\n", user);
 
     ngroups = 16;
     groups = calloc(ngroups, sizeof(gid_t));
@@ -146,122 +161,98 @@ int main(int argc, char **argv)
         groups = calloc(ngroups, sizeof(gid_t));
         if (groups == NULL) goto alloc_failed;
     }
-    if (getgrouplist(user, passwd->pw_gid, groups, &ngroups) == -1) {
-        write_log(ERR, "Failed to get groupd list");
-        retval = 2;
-        goto close;
+    if (getgrouplist(user, passwd->pw_gid, groups, &ngroups) == -1)
+        ERROR(2, "Failed to get groupd list");
+
+    /* Change to normal user */
+    if (setgid(passwd->pw_gid))
+        ERROR(2, "Failed to change group id");
+
+    if (setgroups(ngroups, groups))
+        ERROR(2, "Failed to set groups");
+
+    if (setuid(passwd->pw_uid))
+        ERROR(2, "Failed to set user id");
+
+    write_log(MSG, "Switched to user %s", user);
+    umask(0077);
+
+    /* temporary: write out the options */
+    fd = open("/home/martin/cups-duplex-out", O_WRONLY | O_APPEND);
+    for (n = 0; n < argc; ++n) {
+        if (write(fd, argv[n], strlen(argv[n])) != (int)strlen(argv[n]))
+            write_log(WRN, "debug write %i failed", n);
+        if (write(fd, "\n", 1) != 1)
+            write_log(WRN, "debug write %i.1 failed", n);
     }
+    close(fd);
 
-    pid = fork();
-
-    if (!pid) {
-        /* Change to normal user */
-        if (setgid(passwd->pw_gid)) {
-            write_log(ERR, "Failed to change group id");
-            free(groups);
-            return 2;
-        }
-        if (setgroups(ngroups, groups)) {
-            write_log(ERR, "Failed to set groups");
-            free(groups);
-            return 2;
-        }
-        free(groups);
-        if (setuid(passwd->pw_uid)) {
-            write_log(ERR, "Failed to set user id");
-            return 2;
-        }
-
-        write_log(MSG, "Switched to user %s", user);
-        umask(0077);
-
-        /* temporary: write out the options */
-        fd = open("/home/martin/cups-duplex-out", O_WRONLY | O_APPEND);
-        for (n = 0; n < argc; ++n) {
-            if (write(fd, argv[n], strlen(argv[n])) != (int)strlen(argv[n]))
-                write_log(WRN, "debug write %i failed", n);
-            if (write(fd, "\n", 1) != 1)
-                write_log(WRN, "debug write %i.1 failed", n);
+    fd = -1;
+    /* If input is stdin, write that data into a file, because
+       it will be needed twice. */
+    if (argc == 6) {
+        memcpy(nargv, argv, 6*sizeof(char*));
+        nargv[6] = infilename;
+        strcpy(infilename, "/tmp/cmdw-XXXXXX");
+        fd = mkstemp(infilename);
+        if (fd < 0)
+            ERROR(2, "Failed to create temporary file.");
+        while ((n = read(fileno(stdin), buf, 256)) > 0) {
+            if (write(fd, buf, n) != n) {
+                close(fd);
+                ERROR(2, "Failed writing to temporary file.");
+            }
         }
         close(fd);
-
-        fd = -1;
-        /* If input is stdin, write that data into a file, because
-           it will be needed twice. */
-        if (argc == 6) {
-            memcpy(nargv, argv, 6*sizeof(char*));
-            nargv[6] = infilename;
-            strcpy(infilename, "/tmp/cmdw-XXXXXX");
-            fd = mkstemp(infilename);
-            if (fd < 0) {
-                write_log(ERR, "Failed to create temporary file.");
-                return -1;
-            }
-            while ((n = read(fileno(stdin), buf, 256)) > 0) {
-                if (write(fd, buf, n) != n) {
-                    write_log(ERR, "Failed writing to temporary file.");
-                    close(fd);
-                    return -1;
-                }
-            }
-            close(fd);
-            write_log(DBG, "Created temporary file %s", infilename);
-        }
-
-        n = parse_and_assemble_options(argc == 6 ? nargv : argv, &lp_argv);
-        write_log(DBG, "parse_options returned %i", n);
-        if (n < 0) {
-            if (fd >= 0) unlink(infilename);
-            return -1;
-        }
-
-        if (!duplex) {
-            write_log(MSG, "Printing all pages");
-            prepare_all_pages();
-            if (call_lp(lp_argv)) {
-                if (fd >= 0) unlink(infilename);
-                return -1;
-            }
-            if (fd >= 0) unlink(infilename);
-            return 0;
-        }
-
-        prepare_even_pages();
-        write_log(MSG, "Printing even pages");
-        if (call_lp(lp_argv)) {
-            if (fd >= 0) unlink(infilename);
-            return -1;
-        }
-
-        /* TODO wait for user input */
-
-        prepare_odd_pages();
-        write_log(MSG, "Printing odd pages");
-        if (call_lp(lp_argv)) {
-            if (fd >= 0) unlink(infilename);
-            return -1;
-        }
-
-        if (fd >= 0) unlink(infilename);
-        return 0;
+        write_log(DBG, "Created temporary file %s", infilename);
     }
-    waitpid(pid, &n, 0);
-    if (!WIFEXITED(n)) {
-        write_log(ERR, "Child process exited abnormally");
+
+    n = parse_and_assemble_options(argc == 6 ? nargv : argv, &lp_argv);
+    write_log(DBG, "parse_options returned %i", n);
+    if (n < 0)
+        CLOSE(4);
+
+    if (!duplex) {
+        write_log(MSG, "Printing all pages");
+        prepare_all_pages();
+        if (call_lp(lp_argv))
+            CLOSE(5);
+        CLOSE(0);
     }
-    if (WIFSIGNALED(n)) {
-        write_log(ERR, "Child process died from signal %i", WTERMSIG(n));
+
+    prepare_even_pages();
+    write_log(MSG, "Printing even pages");
+    if (call_lp(lp_argv))
+        CLOSE(5);
+
+
+    n = system("DISPLAY=:0 "
+               "kdialog --yesno \"When the printer is done, please put "
+               "the pages back into \nthe input tray and click Continue "
+               "to print the odd pages.\""
+               " --yes-label Continue --no-label Cancel");
+    if (!WIFEXITED(n) || WEXITSTATUS(n)) {
+        if (WIFEXITED(n))
+            write_log(DBG, "Exit code %i", WEXITSTATUS(n));
+        write_log(MSG, "Stop printing: user aborted.");
+        CLOSE(0);
     }
-    write_log(DBG, "done");
-    goto close;
+
+    prepare_odd_pages();
+    write_log(MSG, "Printing odd pages");
+    if (call_lp(lp_argv))
+        CLOSE(5);
+
+    write_log(DBG, "work done");
+    CLOSE(0);
 
  alloc_failed:
-    write_log(ERR, "Failed to allocate memory");
-    retval = 3;
-    goto close;
+    ERROR(3, "Failed to allocate memory");
 
  close:
     if (groups) free(groups);
+    if (infilename[0]) unlink(infilename);
+    close_log();
 
     return retval;
 }
