@@ -7,6 +7,7 @@ CMDWHDR=cmdw.h cmdw-options.h
 CMDWOBJ=cmdw.o cmdw-options.o
 
 
+.PHONY: all
 all: cmdw
 
 cmdw: ${CMDWOBJ}
@@ -15,19 +16,24 @@ cmdw: ${CMDWOBJ}
 %.o: %.c ${CMDWHDR}
 	${CC} ${CFLAGS} $< -c -o $@
 
+.PHONY: debug
 debug: ${CMDWSRC} ${CMDWHDR}
 	${CC} ${CFLAGS} -DDEBUG -g cmdw.c cmdw-options.c -o cmdw
 
+.PHONY: test
 test:
 	lp -o sides=two-sided-long-edge -d Duplex/ML-1640 ~/studium/diplom/arbeit.pdf
 
+.PHONY: gdb
 gdb: debug
 	sudo gdb ./cmdw
 
+.PHONY: install
 install:
 	cp cmdw /usr/lib/cups/backend
 	chmod 0544 /usr/lib/cups/backend/cmdw
 
+.PHONY: uninstall
 uninstall:
 	rm -f /usr/lib/cups/backend/cmdw
 #lpadmin -p Duplex -P manual-duplex-wrapper.ppd -E -v cmdw:/ -L Virtual Printer

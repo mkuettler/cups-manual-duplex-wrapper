@@ -155,11 +155,11 @@ int main(int argc, char **argv)
 
     ngroups = 16;
     groups = calloc(ngroups, sizeof(gid_t));
-    if (groups == NULL) goto alloc_failed;
+    if (groups == NULL) ERROR(3, "Failed to allocate memory");
     if (getgrouplist(user, passwd->pw_gid, groups, &ngroups) == -1) {
         free(groups);
         groups = calloc(ngroups, sizeof(gid_t));
-        if (groups == NULL) goto alloc_failed;
+        if (groups == NULL) ERROR(3, "Failed to allocate memory");
     }
     if (getgrouplist(user, passwd->pw_gid, groups, &ngroups) == -1)
         ERROR(2, "Failed to get groupd list");
@@ -245,9 +245,6 @@ int main(int argc, char **argv)
 
     write_log(DBG, "work done");
     CLOSE(0);
-
- alloc_failed:
-    ERROR(3, "Failed to allocate memory");
 
  close:
     if (groups) free(groups);
