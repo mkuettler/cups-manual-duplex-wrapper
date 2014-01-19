@@ -25,10 +25,10 @@
 
 #define MIN(a,b) (a < b ? a : b)
 
-#define IF_OPT(o) if (strncmp(o, opts, p-opts) == 0)
+#define IF_OPT(o) if (strncasecmp(o, opts, p-opts) == 0)
 #define ELIF_OPT(o) else IF_OPT(o)
 #define ELIF_OPT_BEGIN(o)                                               \
-    else if (strncmp(o, opts, MIN(strlen(o), (size_t)(p-opts))) == 0)
+    else if (strncasecmp(o, opts, MIN(strlen(o), (size_t)(p-opts))) == 0)
 
 #define SKIP_TO_NEXT_WORD                       \
     for (; *p == ' '; ++p)                      \
@@ -70,6 +70,7 @@ int parse_and_assemble_options(char **oargv, char ***argvp)
     char *p, *buf_p;
     char *opts = oargv[5];
     int i;
+    int collate;
 
     write_log(DBG, "Beginning");
     /* count number of options in opts */
@@ -103,10 +104,9 @@ int parse_and_assemble_options(char **oargv, char ***argvp)
 
     opt_buf = malloc((strlen(opts)+1) * sizeof(char));
     buf_p = opt_buf;
-    argv = *argvp = calloc(2*nopts + 15, sizeof(char*));
+    argv = *argvp = calloc(2*nopts + 17, sizeof(char*));
     argc = 0;
     argv[argc++] = PRINT_CMD;
-    /* TODO Do not pass number of copies - we handle that manually (for now) */
     argv[argc++] = "-t";
     argv[argc++] = oargv[3];
     argv[argc++] = "-o";
@@ -122,6 +122,7 @@ int parse_and_assemble_options(char **oargv, char ***argvp)
 
     /* set default values */
     duplex = 0;
+    collate = 0;
     orientation = 3;
     printer_name = NULL;
 
@@ -199,6 +200,36 @@ int parse_and_assemble_options(char **oargv, char ***argvp)
             SKIP_TO_END_OF_WORD;
             write_log(MSG, "Ignoring option %.*s.", p-opts, opts);
             continue;
+        } ELIF_OPT("collate") {
+            if (*p == '=') {
+                opts = ++p;
+                SKIP_TO_END_OF_WORD;
+                if (strncasecmp("true", opts, p-opts) == 0)
+                    collate = 1;
+                else if (strncasecmp("false", opts, p-opts) == 0)
+                    collate = 0;
+                else
+                    write_log(WRN, "Unknown option duplex=%.*s. Ignored.",
+                              p-opts, opts);
+            } else {
+                collate = 1;
+            }
+        } ELIF_OPT("nocollate") {
+            CHECK_FOR_NO_ARGUMENT;
+            collate = 0;
+        } ELIF_OPT("duplex") {
+            CHECK_FOR_ARGUMENT;
+            SKIP_TO_END_OF_WORD;
+            if (strncasecmp("duplexnotumble", opts, p-opts) == 0) {
+                duplex = 1;
+            } else if (strncmp("duplextumble", opts, p-opts) == 0) {
+                duplex = 2;
+            } else if (strncmp("none", opts, p-opts) == 0) {
+                duplex = 0;
+            } else {
+                write_log(WRN, "Unknown option duplex=%.*s. Ignored.",
+                          p-opts, opts);
+            }
         } ELIF_OPT_BEGIN("time-") {
             SKIP_TO_END_OF_WORD;
             write_log(MSG, "Ignoring option %.*s.", p-opts, opts);
@@ -215,9 +246,21 @@ int parse_and_assemble_options(char **oargv, char ***argvp)
 
     initialized = 1;
     if (!printer_name) {
+#ifdef DEFAULT_PRINTER
+        printer_name = DEFAULT_PRINTER
+#else
         cleanup_options();
         write_log(ERR, "Missing printer name (option cmdw-target-printer).");
         return -1;
+#endif
+    }
+
+    if (!collate || duplex == 0) {
+        argv[argc++] = "-n";
+        argv[argc++] = oargv[4];
+        manual_copies = 0;
+    } else {
+        manual_copies = 1;
     }
 
     argv[argc++] = "-p";

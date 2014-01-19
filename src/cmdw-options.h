@@ -25,6 +25,7 @@
 #endif
 
 EXTERN int duplex;
+EXTERN int manual_copies;
 EXTERN char *printer_name;
 
 #undef EXTERN

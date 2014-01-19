@@ -1,13 +1,63 @@
 
-cups-manueal-duplex-wrapper is a tool that allows duplex printing even when 
+INTRODUCTION
+
+cups-manual-duplex-wrapper is a tool that allows duplex printing even when
 the actual printing driver doesn't support that option.
 It acts as a wrapper around the printer that splits the print job into two
-jobs.
+jobs, one for each side of the paper.
 
-There still are some limitations and hard-coded defaults, but without having
-done a real test I think it should work. Install with 
-	make && sudo make install
+INSTALLATION
 
-I learnt how it could work from cups-pdf, and copied quite some ideas from
-there.
+To compile and install the printer backend, simply type
+
+$ make && sudo make install
+
+You might want to change some configuration before that, see below.
+
+To set up a virtual printer using this backend you can use
+
+$ sudo lpadmin -p <name> -P extra/manual-duplex-wrapper.ppd -v cmdw:/ -L
+"Virtual Printer"
+
+This adds a new printer called <name> to the system.  By itself it isn't all
+that usefull, though, because it still needs a real printer to back it.  One
+option for that is to add a new printer instance
+
+$ lpoptions -d <name>/<instance> -o cmdw-target-printer=<printer-name>
+
+Here <name> is the name of your duplex-wrapper printer that you passed to
+lpadmin.  <printer-name> is the name of a real printer on your system, and
+<instance> is an arbitrary name for your new printer instance.  You can now
+print to <name>/<instance> and the actual printing will be done by
+<printer-name>.  Using this command you can add multiple wrappers for
+different real printers.
+It is also possible to provide more options to in that line.  If, for
+example, you would like to turn on duplex printing by default, you can add
+-o sides=two-sided-long-edge (or two-sided-short-edge) to the above line.
+
+If you only ever need the wrapper for one printer you could also modify
+src/Makefile before you make && sudo make install, to include the line
+DEFOPTS+=-DDEFAULT_PRINTER=<printer-name>
+Then you don't need to create a printer instance, and printing to <name>
+will automatically use the default printer.
+
+UNINSTALL
+
+To uninstall you should remove all Printers using cmdw from your system, and
+then just type sudo make uninstall.
+
+BUGS/LIMITATIONS
+
+There are still a number of missing features, including
+ - You can't print only odd or only even pages (option page-set) with this
+   printer.
+ - You can't print your pages in reverse (option outputorder).
+ - The dialog to confirm the second print job is always displayed on display
+   :0. I'm not sure if there is a way to handle this better.
+
+There are probably more problems. If you find one, let me know!
+
+AUTHOR
+
+Martin Küttler, <martin.kuettler@gmail.com>
 

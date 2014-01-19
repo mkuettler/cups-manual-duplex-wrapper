@@ -120,6 +120,7 @@ int main(int argc, char **argv)
     char buf[256];
     int fd;
     int n;
+    int copies;
     char **lp_argv;
 
     infilename[0] = '\0';
@@ -135,8 +136,8 @@ int main(int argc, char **argv)
     }
 
     if (argc < 6 || argc > 7) {
-        fprintf(stderr, "Usage: cdw job-id user title copies options "
-                "[file]\n");
+        fprintf(stderr, "Usage: %s job-id user title copies options "
+                "[file]\n", argv[0]);
         return 1;
     }
 
@@ -220,28 +221,35 @@ int main(int argc, char **argv)
         CLOSE(0);
     }
 
-    prepare_even_pages();
-    write_log(MSG, "Printing even pages");
-    if (call_lp(lp_argv))
-        CLOSE(5);
+    if (manual_copies)
+        copies = atoi(argv[4]);
+    else
+        copies = 1;
+
+    for (; copies; --copies) {
+        prepare_even_pages();
+        write_log(MSG, "Printing even pages");
+        if (call_lp(lp_argv))
+            CLOSE(5);
 
 
-    n = system("DISPLAY=:0 "
-               "kdialog --yesno \"When the printer is done, please put "
-               "the pages back into \nthe input tray and click Continue "
-               "to print the odd pages.\""
-               " --yes-label Continue --no-label Cancel");
-    if (!WIFEXITED(n) || WEXITSTATUS(n)) {
-        if (WIFEXITED(n))
-            write_log(DBG, "Exit code %i", WEXITSTATUS(n));
-        write_log(MSG, "Stop printing: user aborted.");
-        CLOSE(0);
+        n = system("DISPLAY=:0 "
+                   "kdialog --yesno \"When the printer is done, please put "
+                   "the pages back into \nthe input tray and click Continue "
+                   "to print the odd pages.\""
+                   " --yes-label Continue --no-label Cancel");
+        if (!WIFEXITED(n) || WEXITSTATUS(n)) {
+            if (WIFEXITED(n))
+                write_log(DBG, "Exit code %i", WEXITSTATUS(n));
+            write_log(MSG, "Stop printing: user aborted.");
+            CLOSE(0);
+        }
+
+        prepare_odd_pages();
+        write_log(MSG, "Printing odd pages");
+        if (call_lp(lp_argv))
+            CLOSE(5);
     }
-
-    prepare_odd_pages();
-    write_log(MSG, "Printing odd pages");
-    if (call_lp(lp_argv))
-        CLOSE(5);
 
     write_log(DBG, "work done");
     CLOSE(0);

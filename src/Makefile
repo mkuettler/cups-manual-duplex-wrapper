@@ -1,4 +1,7 @@
 
+DEFOPTS=
+#DEFIOTS+=-D<printer>
+
 CFLAGS=-Wall -Wextra -Werror
 OPT=-O3
 
@@ -14,11 +17,11 @@ cmdw: ${CMDWOBJ}
 	${CC} ${CFLAGS} ${OPT} $^ -o $@
 
 %.o: %.c ${CMDWHDR}
-	${CC} ${CFLAGS} $< -c -o $@
+	${CC} ${CFLAGS} ${DEFOPTS} $< -c -o $@
 
 .PHONY: debug
 debug: ${CMDWSRC} ${CMDWHDR}
-	${CC} ${CFLAGS} -DDEBUG -g cmdw.c cmdw-options.c -o cmdw
+	${CC} ${CFLAGS} ${DEFOPTS} -DDEBUG -g cmdw.c cmdw-options.c -o cmdw
 
 .PHONY: test
 test:
@@ -28,13 +31,5 @@ test:
 gdb: debug
 	sudo gdb ./cmdw
 
-.PHONY: install
-install:
-	cp cmdw /usr/lib/cups/backend
-	chmod 0544 /usr/lib/cups/backend/cmdw
-
-.PHONY: uninstall
-uninstall:
-	rm -f /usr/lib/cups/backend/cmdw
 #lpadmin -p Duplex -P manual-duplex-wrapper.ppd -E -v cmdw:/ -L Virtual Printer
 #lpoptions -d Duplex/ML-1640 -o cmdw-target-printer=ML-1640-Series
