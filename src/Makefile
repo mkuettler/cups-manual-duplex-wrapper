@@ -1,6 +1,6 @@
 
 DEFOPTS=
-#DEFIOTS+=-D<printer>
+#DEFOTS=-DDEFAULT_PRINTER=<printer>
 
 CFLAGS=-Wall -Wextra -Werror
 OPT=-O3
