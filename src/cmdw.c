@@ -184,14 +184,14 @@ int main(int argc, char **argv)
     umask(0077);
 
     /* temporary: write out the options */
-    fd = open("/home/martin/cups-duplex-out", O_WRONLY | O_APPEND);
+    /*fd = open("/home/jonathan/cups-duplex-out", O_WRONLY | O_APPEND);
     for (n = 0; n < argc; ++n) {
         if (write(fd, argv[n], strlen(argv[n])) != (int)strlen(argv[n]))
             write_log(WRN, "debug write %i failed", n);
         if (write(fd, "\n", 1) != 1)
             write_log(WRN, "debug write %i.1 failed", n);
     }
-    close(fd);
+    close(fd);*/
 
     fd = -1;
     /* If input is stdin, write that data into a file, because
@@ -242,7 +242,8 @@ int main(int argc, char **argv)
                    "kdialog --yesno \"When the printer is done, please put "
                    "the pages back into \nthe input tray and click Continue "
                    "to print the odd pages.\""
-                   " --yes-label Continue --no-label Cancel");
+                   " --yes-label Continue --no-label Cancel"
+                   " --title \"Confirm Printing\"");
         if (!WIFEXITED(n) || WEXITSTATUS(n)) {
             if (WIFEXITED(n))
                 write_log(DBG, "Exit code %i", WEXITSTATUS(n));

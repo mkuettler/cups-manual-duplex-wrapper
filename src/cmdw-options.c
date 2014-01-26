@@ -251,13 +251,15 @@ int parse_and_assemble_options(char **oargv, char ***argvp)
 
     initialized = 1;
     if (!printer_name) {
-#ifdef DEFAULT_PRINTER
+/*#ifdef DEFAULT_PRINTER
         printer_name = DEFAULT_PRINTER
 #else
         cleanup_options();
         write_log(ERR, "Missing printer name (option cmdw-target-printer).");
         return -1;
-#endif
+#endif*/
+      //printer_name = "CLP-360_Series";
+        printer_name = "ML-1640-Series";
     }
 
     if (!collate || duplex == 0) {
@@ -268,7 +270,7 @@ int parse_and_assemble_options(char **oargv, char ***argvp)
         manual_copies = 1;
     }
 
-    argv[argc++] = "-p";
+    argv[argc++] = "-d";
     argv[argc++] = printer_name;
 
     argv[argc++] = oargv[6];
@@ -285,7 +287,7 @@ int prepare_odd_pages()
         return -1;
     *outputorder = "outputorder=normal";
     *page_set = "page-set=odd";
-    snprintf(*orientation_req, 24, "orientation_requested=%i", orientation);
+    snprintf(*orientation_req, 24, "orientation-requested=%i", orientation);
     return 0;
 }
 
@@ -295,8 +297,8 @@ int prepare_even_pages()
         return -1;
     *outputorder = "outputorder=reverse";
     *page_set = "page-set=even";
-    snprintf(*orientation_req, 24, "orientation_requested=%i",
-             3+(orientation-1)%4);
+    snprintf(*orientation_req, 24, "orientation-requested=%i",
+             9-orientation);
     return 0;
 }
 
@@ -306,7 +308,7 @@ int prepare_all_pages()
         return -1;
     *outputorder = "outputorder=normal";
     *page_set = "page-set=all";
-    snprintf(*orientation_req, 24, "orientation_requested=%i", orientation);
+    snprintf(*orientation_req, 24, "orientation-requested=%i", orientation);
     return 0;
 }
 
