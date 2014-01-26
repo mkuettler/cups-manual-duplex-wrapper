@@ -252,7 +252,7 @@ int parse_and_assemble_options(char **oargv, char ***argvp)
     initialized = 1;
     if (!printer_name) {
 #ifdef DEFAULT_PRINTER
-        printer_name = DEFAULT_PRINTER
+        printer_name = DEFAULT_PRINTER;
 #else
         cleanup_options();
         write_log(ERR, "Missing printer name (option cmdw-target-printer).");
