@@ -232,7 +232,8 @@ int main(int argc, char **argv)
                    "kdialog --yesno \"When the printer is done, please put "
                    "the pages back into \nthe input tray and click Continue "
                    "to print the odd pages.\""
-                   " --yes-label Continue --no-label Cancel");
+                   " --yes-label Continue --no-label Cancel"
+                   " --title \"Confirm Printing\"");
         if (!WIFEXITED(n) || WEXITSTATUS(n)) {
             if (WIFEXITED(n))
                 write_log(DBG, "Exit code %i", WEXITSTATUS(n));

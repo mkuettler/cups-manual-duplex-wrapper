@@ -16,10 +16,10 @@ all: CFLAGS += -O3
 all: cmdw
 
 cmdw: ${CMDWOBJ}
-	${CC} ${CFLAGS} $^ -o $@
+        ${CC} ${CFLAGS} $^ -o $@
 
 %.o: %.c ${CMDWHDR}
-	${CC} ${CFLAGS} $< -c -o $@
+        ${CC} ${CFLAGS} $< -c -o $@
 
 .PHONY: debug
 debug: CFLAGS += -DDEBUG -g
